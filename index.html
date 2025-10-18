@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ruleta d'adjectius</title>
+  <style>
+    /* 1. General Body Styling */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f0f0f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      color: #333;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    h2 {
+      color: #555;
+      font-weight: 300;
+    }
+
+    /* 2. Roulette Tape Styling */
+    .tape-container {
+      position: relative;
+      height: 150px;
+      width: 80vw;
+      max-width: 900px;
+      /* Added for large screens */
+      border: 3px solid #333;
+      overflow: hidden;
+      background-color: #fff;
+      /* Added for a clean look */
+    }
+
+    #tape {
+      position: absolute;
+      display: flex;
+      height: 100%;
+      /* Transition is set by JavaScript */
+    }
+
+    #tape img {
+      width: 150px;
+      height: 150px;
+      object-fit: cover;
+      border-right: 1px solid #ddd;
+      box-sizing: border-box;
+      /* Prevents border from adding to width */
+    }
+
+    /* 3. Pointer Styling */
+    .pointer {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 100%;
+      background-color: #f03a47;
+      /* Bright red color */
+      z-index: 10;
+    }
+
+    /* 4. Controls and Result Styling */
+    #spinButton {
+      margin-top: 25px;
+      padding: 12px 24px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s, transform 0.1s;
+    }
+
+    #spinButton:hover {
+      background-color: #0056b3;
+    }
+
+    #spinButton:active {
+      transform: scale(0.98);
+    }
+
+    #spinButton:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    #result-container {
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    #selectedImage {
+      margin-top: 10px;
+      width: 300px;
+      height: 300px;
+      border: 5px solid #333;
+      background-color: #fff;
+      object-fit: cover;
+      border-radius: 5px;
+      /* Added for softer edges */
+    }
+
+    #tape img.used {
+      opacity: 0.3;
+      filter: grayscale(100%);
+      /* Afegim una transició suau perquè el canvi no sigui tan brusc */
+      transition: opacity 0.4s, filter 0.4s;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Ruleta d'adjectius</h1>
+
+  <div class="tape-container">
+    <div id="tape"></div>
+    <div class="pointer"></div>
+  </div>
+
+  <button id="spinButton">Que rodi la ruleta!</button>
+
+  <div id="result-container">
+    <h2>Imatge seleccionada:</h2>
+    <img id="selectedImage" src="" alt="The selected image will appear here.">
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+      // 1. Constants and DOM References
+      const tape = document.getElementById('tape');
+      const spinButton = document.getElementById('spinButton');
+      const selectedImage = document.getElementById('selectedImage');
+      const tapeContainer = document.querySelector('.tape-container');
+
+      const IMAGE_WIDTH = 150; // Must match CSS width
+      const SPIN_DURATION_S = 5; // Spin animation time in seconds
+      const SPIN_ROTATIONS = 5; // Number of full "tape" rotations
+
+      // Master list of 15 unique placeholder images
+      const MASTER_IMAGES =
+        [
+          "imatges/casaBlava.png", "imatges/casesBlaves.png", "imatges/cotxesvermells.png",
+          "imatges/cotxevermell.png", "imatges/gatNegre.png", "imatges/gatsNegres.png",
+          "imatges/llibresVerds.png", "imatges/llibreVerd.png", "imatges/metgeJove.png",
+          "imatges/metgessaJove.png", "imatges/nenaalta.png", "imatges/nenalt.png",
+          "imatges/nenesaltes.png", "imatges/nensalts.png", "imatges/noiaRossa.png",
+          "imatges/noiesAltes.png", "imatges/noiRos.png", "imatges/noisAlts.png",
+          "imatges/ocelletGroc.png", "imatges/ocelletsGrocs.png", "imatges/reinaVella.png",
+          "imatges/reiVell.png"
+        ];
+
+      // 2. State Variables
+      let selectableImages = [...MASTER_IMAGES];
+      let isSpinning = false;
+
+      /**
+       * Helper function to calculate the final 'transform: translateX' value
+       * to center a specific image index under the pointer.
+       * @param {number} index - The index of the image to center.
+       */
+      function getPositionForIndex(index) {
+        const containerWidth = tapeContainer.clientWidth;
+        // Formula: -(index * IMAGE_WIDTH) + (containerWidth / 2) - (IMAGE_WIDTH / 2)
+        // This centers the target image under the pointer (at containerWidth / 2).
+        return -(index * IMAGE_WIDTH) + (containerWidth / 2) - (IMAGE_WIDTH / 2);
+      }
+
+      /**
+       * Sets up the initial state of the roulette tape.
+       * Creates three copies of the master list for the "infinite" illusion.
+       * Positions the tape at the start of the middle block without animation.
+       */
+      /**
+             * Sets up the initial state of the roulette tape.
+             * Creates enough copies of the master list to handle the spin rotations.
+             * Positions the tape at the start of the "middle" block without animation.
+             */
+      function setupTape() {
+        tape.innerHTML = ''; // Clear any existing images
+
+        // El bloc "central" on sempre tornarem
+        const middleBlockIndex = SPIN_ROTATIONS;
+
+        // Crear una cinta prou llarga: [Bloc 0, Bloc 1, ..., Bloc (SPIN_ROTATIONS), Bloc (SPIN_ROTATIONS+1)]
+        // Necessitem (SPIN_ROTATIONS) blocs abans del central, + el central, + 1 de coixí.
+        let tapeContent = [];
+        const totalBlocks = SPIN_ROTATIONS + 2; // Total de blocs a la cinta
+
+        for (let i = 0; i < totalBlocks; i++) {
+          tapeContent = tapeContent.concat(MASTER_IMAGES);
+        }
+
+        // Populate the tape with <img> elements
+        for (const src of tapeContent) {
+          const img = document.createElement('img');
+          img.src = src;
+          img.alt = "Roulette Image";
+          tape.appendChild(img);
+        }
+
+        // Set the initial position.
+        // Comencem al principi del *bloc central* (que ara és a l'índex SPIN_ROTATIONS)
+        tape.style.transition = 'none'; // Disable transitions for this initial set
+        const initialIndex = middleBlockIndex * MASTER_IMAGES.length;
+        const initialPosition = getPositionForIndex(initialIndex);
+        tape.style.transform = `translateX(${initialPosition}px)`;
+      }
+
+      /**
+       * Handles the main "Spin" button click event.
+       */
+      function handleSpin() {
+        // Guard clauses
+        if (isSpinning) return;
+
+        if (selectableImages.length === 0) {
+          spinButton.textContent = "All Done!";
+          spinButton.disabled = true;
+          return;
+        }
+
+        isSpinning = true;
+        spinButton.disabled = true;
+
+        // 1. Pick a random, unselected image
+        const randomIndex = Math.floor(Math.random() * selectableImages.length);
+        const selectedSrc = selectableImages[randomIndex];
+
+        // 2. Calculate animation positions
+        // Find the image's index in the original master list
+        const targetIndexInMaster = MASTER_IMAGES.indexOf(selectedSrc);
+        // Target the *equivalent* image in the *middle* block for the final resting spot
+        const targetIndexInTape = MASTER_IMAGES.length + targetIndexInMaster;
+
+        // Calculate the final resting position (where the tape will jump back to)
+        const finalPosition = getPositionForIndex(targetIndexInTape);
+
+        // Calculate the animation destination by adding several full rotations
+        const tapeLength = MASTER_IMAGES.length * IMAGE_WIDTH;
+        const spinDistance = tapeLength * SPIN_ROTATIONS;
+        const spinPosition = finalPosition - spinDistance;
+
+        // 3. Define the 'transitionend' handler
+        // This function will run *once* after the spin animation completes.
+        const onSpinEnd = () => {
+          // A. Update the result display
+          selectedImage.src = selectedSrc;
+          selectedImage.alt = `Selected: ${selectedSrc.split('text=')[1] || 'Image'}`;
+
+          // B. Remove the selected image from the available pool
+          selectableImages.splice(randomIndex, 1);
+
+          // --- NOVA PART ---
+          // C. Marcar totes les instàncies d'aquesta imatge com a "utilitzades"
+          //    Trobem totes les imatges a la cinta que tinguin exactament la mateixa URL
+          const allInstances = tape.querySelectorAll(`img[src="${selectedSrc}"]`);
+          allInstances.forEach(img => {
+            img.classList.add('used');
+          });
+          // --- FI NOVA PART ---
+
+          // D. Perform the "invisible reset" (abans era C)
+          // Instantly jump back to the equivalent image in the middle block
+          tape.style.transition = 'none';
+          tape.style.transform = `translateX(${finalPosition}px)`;
+
+          // E. Re-enable controls (abans era D)
+          if (selectableImages.length > 0) {
+            spinButton.disabled = false;
+          } else {
+            spinButton.textContent = "All Done!";
+            // Button remains disabled
+          }
+          isSpinning = false;
+        };
+
+        // 4. Attach the one-time event listener
+        tape.addEventListener('transitionend', onSpinEnd, {
+          once: true
+        });
+
+        // 5. Start the animation
+        // Re-enable transitions and set the final transform position
+        tape.style.transition = `transform ${SPIN_DURATION_S}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
+        tape.style.transform = `translateX(${spinPosition}px)`;
+      }
+
+      // 4. Initialization
+      spinButton.addEventListener('click', handleSpin);
+      setupTape(); // Call the setup function to initialize the app
+
+    });
+  </script>
+
+</body>
+
+</html>
